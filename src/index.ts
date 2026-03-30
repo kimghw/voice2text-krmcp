@@ -71,6 +71,21 @@ async function processAudio(filePath: string) {
   };
 }
 
+function saveOutput(text: string, outputPath: string): string {
+  const dir = path.dirname(outputPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(outputPath, text, "utf-8");
+  return outputPath;
+}
+
+function defaultOutputPath(filePath: string): string {
+  const dir = path.dirname(filePath);
+  const name = path.basename(filePath, path.extname(filePath));
+  return path.join(dir, `${name}.txt`);
+}
+
 const server = new McpServer({
   name: "voice2text",
   version: "1.0.0",
@@ -78,13 +93,14 @@ const server = new McpServer({
 
 server.tool(
   "transcribe_audio",
-  "Transcribe an audio file to text using Gemini API",
+  "Transcribe an audio file to text with speaker diarization using Gemini API",
   {
     file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac, m4a, mp4, opus, pcm, webm)"),
     language: z.string().optional().describe("Target language (e.g. 'ko', 'en', 'ja')"),
     prompt: z.string().optional().describe("Custom prompt for transcription"),
+    output_path: z.string().optional().describe("Output txt file path (defaults to same directory as audio file with .txt extension)"),
   },
-  async ({ file_path, language, prompt }) => {
+  async ({ file_path, language, prompt, output_path }) => {
     try {
       const audio = await processAudio(file_path);
       const client = getClient();
@@ -93,9 +109,9 @@ server.tool(
       if (prompt) {
         transcriptionPrompt = prompt;
       } else if (language) {
-        transcriptionPrompt = `Generate a transcript of the speech in ${language}. Return only the transcript text.`;
+        transcriptionPrompt = `Generate a transcript of the speech in ${language} with speaker diarization. Identify and label each speaker (Speaker 1, Speaker 2, etc.). Format each line as "Speaker N: text". Return only the transcript.`;
       } else {
-        transcriptionPrompt = "Generate a transcript of the speech. Return only the transcript text.";
+        transcriptionPrompt = "Generate a transcript of the speech with speaker diarization. Identify and label each speaker (Speaker 1, Speaker 2, etc.). Format each line as \"Speaker N: text\". Return only the transcript.";
       }
 
       const audioPart =
@@ -114,7 +130,9 @@ server.tool(
       });
 
       const text = response.text ?? "No transcription result";
-      return { content: [{ type: "text" as const, text }] };
+      const outFile = output_path || defaultOutputPath(file_path);
+      saveOutput(text, outFile);
+      return { content: [{ type: "text" as const, text: `${text}\n\n[Saved to ${outFile}]` }] };
     } catch (err: any) {
       return { content: [{ type: "text" as const, text: `Error: ${err.message}` }], isError: true };
     }
@@ -127,8 +145,9 @@ server.tool(
   {
     file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac, m4a, mp4, opus, pcm, webm)"),
     language: z.string().optional().describe("Target language (e.g. 'ko', 'en', 'ja')"),
+    output_path: z.string().optional().describe("Output txt file path (defaults to same directory as audio file with .txt extension)"),
   },
-  async ({ file_path, language }) => {
+  async ({ file_path, language, output_path }) => {
     try {
       const audio = await processAudio(file_path);
       const client = getClient();
@@ -152,7 +171,9 @@ server.tool(
       });
 
       const text = response.text ?? "No transcription result";
-      return { content: [{ type: "text" as const, text }] };
+      const outFile = output_path || defaultOutputPath(file_path);
+      saveOutput(text, outFile);
+      return { content: [{ type: "text" as const, text: `${text}\n\n[Saved to ${outFile}]` }] };
     } catch (err: any) {
       return { content: [{ type: "text" as const, text: `Error: ${err.message}` }], isError: true };
     }
@@ -166,8 +187,9 @@ server.tool(
     file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac, m4a, mp4, opus, pcm, webm)"),
     language: z.string().optional().describe("Target language (e.g. 'ko', 'en', 'ja')"),
     num_speakers: z.number().optional().describe("Expected number of speakers (if known)"),
+    output_path: z.string().optional().describe("Output txt file path (defaults to same directory as audio file with .txt extension)"),
   },
-  async ({ file_path, language, num_speakers }) => {
+  async ({ file_path, language, num_speakers, output_path }) => {
     try {
       const audio = await processAudio(file_path);
       const client = getClient();
@@ -197,7 +219,9 @@ server.tool(
       });
 
       const text = response.text ?? "No transcription result";
-      return { content: [{ type: "text" as const, text }] };
+      const outFile = output_path || defaultOutputPath(file_path);
+      saveOutput(text, outFile);
+      return { content: [{ type: "text" as const, text: `${text}\n\n[Saved to ${outFile}]` }] };
     } catch (err: any) {
       return { content: [{ type: "text" as const, text: `Error: ${err.message}` }], isError: true };
     }
