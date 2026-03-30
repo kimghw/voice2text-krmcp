@@ -13,7 +13,16 @@ const SUPPORTED_FORMATS: Record<string, string> = {
   ".aac": "audio/aac",
   ".ogg": "audio/ogg",
   ".flac": "audio/flac",
+  ".m4a": "audio/m4a",
+  ".mp4": "audio/mp4",
+  ".mpeg": "audio/mpeg",
+  ".mpga": "audio/mpga",
+  ".opus": "audio/opus",
+  ".pcm": "audio/pcm",
+  ".webm": "audio/webm",
 };
+
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB (File API limit)
 
 function getClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -34,8 +43,14 @@ async function processAudio(filePath: string) {
     throw new Error(`File not found: ${filePath}`);
   }
 
-  const client = getClient();
   const fileSize = fs.statSync(filePath).size;
+  if (fileSize > MAX_FILE_SIZE) {
+    throw new Error(
+      `File size (${(fileSize / (1024 * 1024 * 1024)).toFixed(2)}GB) exceeds the 2GB limit`
+    );
+  }
+
+  const client = getClient();
 
   // Files > 20MB: use File API upload
   if (fileSize > 20 * 1024 * 1024) {
@@ -65,7 +80,7 @@ server.tool(
   "transcribe_audio",
   "Transcribe an audio file to text using Gemini API",
   {
-    file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac)"),
+    file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac, m4a, mp4, opus, pcm, webm)"),
     language: z.string().optional().describe("Target language (e.g. 'ko', 'en', 'ja')"),
     prompt: z.string().optional().describe("Custom prompt for transcription"),
   },
@@ -110,7 +125,7 @@ server.tool(
   "transcribe_audio_with_timestamps",
   "Transcribe an audio file with timestamps using Gemini API",
   {
-    file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac)"),
+    file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac, m4a, mp4, opus, pcm, webm)"),
     language: z.string().optional().describe("Target language (e.g. 'ko', 'en', 'ja')"),
   },
   async ({ file_path, language }) => {
@@ -148,7 +163,7 @@ server.tool(
   "transcribe_audio_with_speakers",
   "Transcribe an audio file with speaker diarization using Gemini API",
   {
-    file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac)"),
+    file_path: z.string().describe("Absolute path to the audio file (wav, mp3, aiff, aac, ogg, flac, m4a, mp4, opus, pcm, webm)"),
     language: z.string().optional().describe("Target language (e.g. 'ko', 'en', 'ja')"),
     num_speakers: z.number().optional().describe("Expected number of speakers (if known)"),
   },
